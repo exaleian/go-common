@@ -1,0 +1,451 @@
+openapi: 3.0.0
+info:
+  title: Data Summary API
+  version: '1.0'
+  description: |-
+    The Tidepool API is an HTTP REST API used by Tidepool clients use to communicate with the Tidepool Platform.
+
+    For more information, see the [Getting Started](../docs/quick-start.md) section.
+  contact:
+    name: Tidepool
+    url: https://www.tidepool.org
+    email: support@tidepool.org
+  termsOfService: https://developer.tidepool.org/terms-of-use/
+  license:
+    name: BSD 2-Clause "Simplified" License
+    url: https://github.com/tidepool-org/summary/blob/master/LICENSE
+  x-tidepool-service: https://github.com/tidepool-org/summary
+servers:
+  - url: https://external.integration.tidepool.org
+    description: integration
+  - url: https://api.tidepool.org
+    description: production
+  - url: https://dev1.dev.tidepool.org
+    description: dev1
+  - url: https://qa1.development.tidepool.org
+    description: qa1
+  - url: https://qa2.development.tidepool.org
+    description: qa2
+security:
+  - sessionToken: []
+tags:
+  - name: Internal
+    description: APIs intended for internal use by Tidepool.
+  - name: Summary
+    description: |-
+      Summary Data
+
+      This API is for a component within the `data` service that calculates summary statistics for user accounts.
+      These routes are mostly executed by the `task` and `clinic-worker` services.
+paths:
+  /v1/summaries/{summaryType}/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/summaryType.v5'
+      - $ref: '#/components/parameters/userId'
+    get:
+      summary: Get User Summary
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/summary.v5'
+        '400':
+          description: Bad Request
+        '403':
+          description: Forbidden
+        '500':
+          description: Internal Server Error
+      operationId: GetSummary
+      description: Retrieve a summary by user id
+      x-internal: true
+      tags:
+        - Summary
+        - Internal
+components:
+  securitySchemes:
+    sessionToken:
+      description: Tidepool Session Token
+      type: apiKey
+      name: X-Tidepool-Session-Token
+      in: header
+    serverToken:
+      description: Tidepool Server Token
+      type: apiKey
+      name: X-Tidepool-Session-Token
+      in: header
+  parameters:
+    summaryType.v5:
+      name: summaryType
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/summaryType.v5'
+    userId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/tidepooluserid'
+  schemas:
+    summaryType.v5:
+      type: string
+      title: Summary Type
+      enum:
+        - cgm
+        - bgm
+        - con
+      description: Field which contains a summary type string.
+      x-go-type: string
+      x-go-type-skip-optional-pointer: true
+    tidepooluserid:
+      type: string
+      title: Tidepool User ID
+      pattern: ^([0-9a-f]{10}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$
+      description: String representation of a Tidepool User ID. Old style IDs are 10-digit strings consisting of only hexadeximcal digits. New style IDs are 36-digit [UUID v4](https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random))
+      readOnly: true
+      x-go-type: string
+    summaryId.v1:
+      title: Summary ID
+      description: Summary Unique Identifier
+      type: string
+      minLength: 24
+      maxLength: 24
+      pattern: ^[a-f0-9]{24}$
+      readOnly: true
+      example: 2fe2488217ee43e1b2e83c2f
+    summaryConfig.v1:
+      type: object
+      title: config.v1
+      x-go-type-skip-optional-pointer: true
+      description: Summary schema version and calculation configuration
+      properties:
+        schemaVersion:
+          description: Summary schema version
+          type: number
+          x-go-type: int
+        highGlucoseThreshold:
+          description: Threshold used for determining if a value is high
+          type: number
+          x-go-type: float64
+        veryHighGlucoseThreshold:
+          description: Threshold used for determining if a value is very high
+          type: number
+          x-go-type: float64
+        lowGlucoseThreshold:
+          description: Threshold used for determining if a value is low
+          type: number
+          x-go-type: float64
+        veryLowGlucoseThreshold:
+          description: Threshold used for determining if a value is very low
+          type: number
+          x-go-type: float64
+      required:
+        - schemaVersion
+        - highGlucoseThreshold
+        - veryHighGlucoseThreshold
+        - lowGlucoseThreshold
+        - veryLowGlucoseThreshold
+    summaryDates.v5:
+      type: object
+      title: summaryDates.v5
+      x-go-type-skip-optional-pointer: true
+      description: dates tracked for summary calculation
+      properties:
+        lastUpdatedDate:
+          description: Date of the last calculation
+          type: string
+          format: date-time
+        lastUpdatedReason:
+          description: List of reasons the summary was updated for
+          type: array
+          items:
+            type: string
+        firstData:
+          description: Date of the first included value
+          type: string
+          format: date-time
+        lastData:
+          description: Date of the last calculated value
+          type: string
+          format: date-time
+        lastUploadDate:
+          description: Created date of the last calculated value
+          type: string
+          format: date-time
+        outdatedSince:
+          description: Date of the first user upload after lastData, removed when calculated
+          type: string
+          format: date-time
+        outdatedReason:
+          description: List of reasons the summary was marked outdated for
+          type: array
+          items:
+            type: string
+      required:
+        - firstData
+        - lastData
+        - lastUpdatedReason
+        - lastUpdatedDate
+        - lastUploadDate
+        - outdatedReason
+    summaryBase.v5:
+      type: object
+      title: summarybase.v5
+      description: shared properties of all summaries
+      properties:
+        id:
+          $ref: '#/components/schemas/summaryId.v1'
+        type:
+          $ref: '#/components/schemas/summaryType.v5'
+        userId:
+          $ref: '#/components/schemas/tidepooluserid'
+        config:
+          $ref: '#/components/schemas/summaryConfig.v1'
+        dates:
+          $ref: '#/components/schemas/summaryDates.v5'
+    glucoseRange.v5:
+      type: object
+      title: glucoserange.v5
+      description: Metrics for a particular range of glucose values
+      properties:
+        glucose:
+          description: total of glucose values
+          type: number
+          example: 55.5
+          x-go-type: float64
+        minutes:
+          description: total of minutes represented
+          type: number
+          example: 55
+          x-go-type: int
+        records:
+          description: total records
+          type: number
+          example: 5
+          x-go-type: int
+        percent:
+          description: percent of all ranges this range represents, or total CGM use in a Total range
+          type: number
+          example: 0.33
+          x-go-type: float64
+        variance:
+          description: total variance of the values in this range
+          type: number
+          example: 15.5
+          x-go-type: float64
+      x-go-type-skip-optional-pointer: true
+      required:
+        - glucose
+        - minutes
+        - records
+        - percent
+        - variance
+    glucoseRanges.v5:
+      type: object
+      title: glucoseranges.v5
+      description: glucose ranges
+      properties:
+        total:
+          $ref: '#/components/schemas/glucoseRange.v5'
+        inVeryLow:
+          $ref: '#/components/schemas/glucoseRange.v5'
+        inLow:
+          $ref: '#/components/schemas/glucoseRange.v5'
+        inTarget:
+          $ref: '#/components/schemas/glucoseRange.v5'
+        inHigh:
+          $ref: '#/components/schemas/glucoseRange.v5'
+        inVeryHigh:
+          $ref: '#/components/schemas/glucoseRange.v5'
+        inExtremeHigh:
+          $ref: '#/components/schemas/glucoseRange.v5'
+        inAnyLow:
+          $ref: '#/components/schemas/glucoseRange.v5'
+        inAnyHigh:
+          $ref: '#/components/schemas/glucoseRange.v5'
+    glucoseMinMax.v5:
+      type: object
+      title: glucoseminmax.v5
+      description: minimum and maximum glucose values
+      properties:
+        min:
+          type: number
+          example: 3
+          x-go-type: float64
+        minDelta:
+          type: number
+          example: 3
+          x-go-type: float64
+        max:
+          type: number
+          example: 8
+          x-go-type: float64
+        maxDelta:
+          type: number
+          example: 8
+          x-go-type: float64
+      x-go-type-skip-optional-pointer: true
+      required:
+        - min
+        - minDelta
+        - max
+        - maxDelta
+    glucosePeriodDelta.v5:
+      type: object
+      title: glucoseperiod.v5
+      description: 'Summary of a specific CGM time period (currently: 1d, 7d, 14d, 30d)'
+      allOf:
+        - $ref: '#/components/schemas/glucoseRanges.v5'
+        - $ref: '#/components/schemas/glucoseMinMax.v5'
+        - type: object
+          properties:
+            hoursWithData:
+              type: number
+              example: 2
+              x-go-type: int
+            daysWithData:
+              type: number
+              example: 2
+              x-go-type: int
+            averageGlucoseMmol:
+              description: Average Glucose of records in this period
+              type: number
+              example: 5.5
+              x-go-type: float64
+            glucoseManagementIndicator:
+              type: number
+              x-go-type: float64
+              description: A derived value which emulates A1C
+              example: 7.5
+            coefficientOfVariation:
+              type: number
+              example: 2.5
+              x-go-type: float64
+            standardDeviation:
+              type: number
+              example: 2.5
+              x-go-type: float64
+            averageDailyRecords:
+              description: Average daily readings
+              type: number
+              example: 3.5
+              x-go-type: float64
+          required:
+            - hoursWithData
+            - daysWithData
+            - averageGlucose
+            - glucoseManagementIndicator
+            - coefficientOfVariation
+            - standardDeviation
+            - averageDailyRecords
+            - averageGlucoseMmol
+    glucosePeriod.v5:
+      type: object
+      title: glucoseperiod.v5
+      description: 'Summary of a specific CGM time period (currently: 1d, 7d, 14d, 30d)'
+      allOf:
+        - $ref: '#/components/schemas/glucoseRanges.v5'
+        - $ref: '#/components/schemas/glucoseMinMax.v5'
+        - type: object
+          properties:
+            hoursWithData:
+              type: number
+              example: 2
+              x-go-type: int
+            daysWithData:
+              type: number
+              example: 2
+              x-go-type: int
+            averageGlucoseMmol:
+              description: Average Glucose of records in this period
+              type: number
+              example: 5.5
+              x-go-type: float64
+            glucoseManagementIndicator:
+              type: number
+              x-go-type: float64
+              description: A derived value which emulates A1C
+              example: 7.5
+            coefficientOfVariation:
+              type: number
+              example: 2.5
+              x-go-type: float64
+            standardDeviation:
+              type: number
+              example: 2.5
+              x-go-type: float64
+            averageDailyRecords:
+              description: Average daily readings
+              type: number
+              example: 3.5
+              x-go-type: float64
+            delta:
+              $ref: '#/components/schemas/glucosePeriodDelta.v5'
+          required:
+            - hoursWithData
+            - daysWithData
+            - averageGlucose
+            - glucoseManagementIndicator
+            - coefficientOfVariation
+            - standardDeviation
+            - averageDailyRecords
+            - averageGlucoseMmol
+    cgmPeriods.v5:
+      type: object
+      title: cgmperiods.v5
+      description: A map to each supported CGM summary period
+      additionalProperties:
+        $ref: '#/components/schemas/glucosePeriod.v5'
+    bgmPeriods.v5:
+      type: object
+      title: bgmperiods.v5
+      description: A map to each supported BGM summary period
+      additionalProperties:
+        $ref: '#/components/schemas/glucosePeriod.v5'
+    continuousRanges.v5:
+      type: object
+      title: continuousranges.v5
+      description: continuous ranges
+      properties:
+        realtime:
+          $ref: '#/components/schemas/glucoseRange.v5'
+        deferred:
+          $ref: '#/components/schemas/glucoseRange.v5'
+        total:
+          $ref: '#/components/schemas/glucoseRange.v5'
+    continuousPeriod.v5:
+      type: object
+      title: continuousperiod.v5
+      description: 'Summary of a specific CGM time period (currently: 1d, 7d, 14d, 30d)'
+      allOf:
+        - $ref: '#/components/schemas/continuousRanges.v5'
+        - type: object
+          properties:
+            averageDailyRecords:
+              description: Average daily readings
+              type: number
+              example: 3.5
+              x-go-type: float64
+      required:
+        - averageDailyRecords
+    continuousPeriods.v5:
+      type: object
+      title: continuousperiods.v5
+      description: A map to each supported Continuous summary period
+      additionalProperties:
+        $ref: '#/components/schemas/continuousPeriod.v5'
+    summary.v5:
+      type: object
+      title: summary.v5
+      description: A summary of a users recent data
+      allOf:
+        - $ref: '#/components/schemas/summaryBase.v5'
+        - type: object
+          properties:
+            periods:
+              oneOf:
+                - $ref: '#/components/schemas/cgmPeriods.v5'
+                - $ref: '#/components/schemas/bgmPeriods.v5'
+                - $ref: '#/components/schemas/continuousPeriods.v5'
